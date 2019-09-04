@@ -1,3 +1,5 @@
+import datetime
+
 from switter.client import Switter
 
 
@@ -11,7 +13,11 @@ def test_twitter():
 
     assert not twitter['private']
 
-    assert twitter['following'] > 30
-    assert twitter['followers'] > 56_600_000
-    assert twitter['favorites'] > 6200
-    assert twitter['tweets'] > 11500
+    assert twitter['following_count'] > 30
+    assert twitter['followers_count'] > 56_600_000
+    assert twitter['favorites_count'] > 6200
+    assert twitter['tweets_count'] > 11500
+
+    assert twitter['created_at'] == datetime.datetime(
+        2007, 2, 20, 14, 35, 54, tzinfo=datetime.timezone.utc
+    )

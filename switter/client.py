@@ -1,35 +1,9 @@
+import datetime
+import html
+import json
 import requests
 
 from bs4 import BeautifulSoup
-
-
-def _profile_nav_stat(navigation: BeautifulSoup, name: str) -> int:
-    assert navigation.name == 'div'
-    assert 'ProfileNav' in navigation.attrs['class']
-    assert navigation.attrs['role'] == 'navigation'
-
-    return int(
-        navigation.find('a', attrs={'class': 'ProfileNav-stat', 'data-nav': name})
-        .find('span', attrs={'class': 'ProfileNav-value'})
-        .attrs['data-count']
-    )
-
-
-def _profile_navigation(document: BeautifulSoup) -> BeautifulSoup:
-    return document.find('div', attrs={'class': 'ProfileNav', 'role': 'navigation'})
-
-
-def _profile_user_actions(document: BeautifulSoup) -> BeautifulSoup:
-    return document.select_one('div.user-actions.btn-group.not-following')
-
-
-def _is_profile_private(user_actions: BeautifulSoup) -> bool:
-    protected = user_actions.attrs['data-protected']
-    if protected == 'false':
-        return False
-    if protected == 'true':
-        return True
-    raise ValueError(f"Unexpected data-protected value: {protected}")
 
 
 class Switter:
@@ -40,19 +14,27 @@ class Switter:
         return response.text
 
     def profile(self, screen_name: str) -> dict:
-        html = self._profile_html(screen_name)
-        document = BeautifulSoup(html, 'lxml')
-
-        user_actions = _profile_user_actions(document)
-        navigation = _profile_navigation(document)
+        profile_html = self._profile_html(screen_name)
+        document = BeautifulSoup(profile_html, 'lxml')
+        data = json.loads(
+            html.unescape(
+                document.find(
+                    'input',
+                    attrs={'id': 'init-data', 'class': 'json-data', 'type': 'hidden'},
+                ).attrs['value']
+            )
+        )
+        user = data['profile_user']
+        date_format = r'%a %b %d %H:%M:%S %z %Y'
 
         return dict(
-            id=int(user_actions.attrs['data-user-id']),
-            name=user_actions.attrs['data-name'],
-            screen_name=user_actions.attrs['data-screen-name'],
-            private=_is_profile_private(user_actions),
-            tweets=_profile_nav_stat(navigation, 'tweets'),
-            following=_profile_nav_stat(navigation, 'following'),
-            followers=_profile_nav_stat(navigation, 'followers'),
-            favorites=_profile_nav_stat(navigation, 'favorites'),
+            id=user['id'],
+            name=user['name'],
+            screen_name=user['screen_name'],
+            created_at=datetime.datetime.strptime(user['created_at'], date_format),
+            following_count=user['friends_count'],
+            followers_count=user['followers_count'],
+            favorites_count=user['favourites_count'],
+            tweets_count=user['statuses_count'],
+            private=user['protected'],
         )
