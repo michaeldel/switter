@@ -13,7 +13,11 @@ def test_twitter():
 
     assert not twitter['private']
 
-    assert twitter['following_count'] > 30
+    assert twitter['location'] == "Everywhere"
+    assert twitter['website'] == 'https://about.twitter.com/'
+    assert twitter['description'] == "What\u2019s happening?!"
+
+    assert twitter['following_count'] > 0
     assert twitter['followers_count'] > 56_600_000
     assert twitter['favorites_count'] > 6200
     assert twitter['tweets_count'] > 11500
