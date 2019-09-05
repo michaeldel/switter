@@ -6,10 +6,17 @@ import requests
 from bs4 import BeautifulSoup
 
 
+_CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+
+
 class Switter:
+    def __init__(self):
+        self._session = requests.Session()
+        self._session.headers.update({'User-Agent': _CHROME_USER_AGENT})
+
     def _profile_html(self, screen_name: str) -> str:
         url = f'https://twitter.com/{screen_name}'
-        response = requests.get(url)
+        response = self._session.get(url)
         response.raise_for_status()
         return response.text
 
