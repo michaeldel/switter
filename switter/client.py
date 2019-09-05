@@ -6,7 +6,37 @@ import requests
 from bs4 import BeautifulSoup
 
 
-_CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+_CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'  # noqa: E501
+
+
+def _parse_tweet(tweet: BeautifulSoup) -> dict:
+    div = tweet.find('div', attrs={'class': 'tweet'})
+    timestamp = tweet.select_one('a.tweet-timestamp > span._timestamp')
+
+    created_at = datetime.datetime.fromtimestamp(
+        int(timestamp.attrs['data-time-ms']) / 1000, tz=datetime.timezone.utc
+    )
+
+    return {
+        'id': int(div.attrs['data-tweet-id']),
+        'conversation_id': int(div.attrs['data-conversation-id']),
+        'created_at': created_at,
+        'user_id': int(div.attrs['data-user-id']),
+        'user_name': div.attrs['data-name'],
+        'user_screen_name': div.attrs['data-screen-name'],
+        'text': div.find('p', attrs={'class': 'tweet-text'}).text,
+        'replies_count': _tweet_stat(div, 'reply'),
+        'retweets_count': _tweet_stat(div, 'retweet'),
+        'favorites_count': _tweet_stat(div, 'favorite'),
+    }
+
+
+def _tweet_stat(tweet: BeautifulSoup, name: str) -> int:
+    return int(
+        tweet.select_one(
+            f'span.ProfileTweet-action--{name} > span.ProfileTweet-actionCount'
+        ).attrs['data-tweet-stat-count']
+    )
 
 
 class Switter:
@@ -19,6 +49,12 @@ class Switter:
         response = self._session.get(url)
         response.raise_for_status()
         return response.text
+
+    def _search_json(self, query: str) -> dict:
+        url = 'https://twitter.com/i/search/timeline'
+        response = self._session.get(url, params={'q': query, 'f': 'tweets'})
+        response.raise_for_status()
+        return response.json()
 
     def profile(self, screen_name: str) -> dict:
         profile_html = self._profile_html(screen_name)
@@ -48,3 +84,9 @@ class Switter:
             tweets_count=user['statuses_count'],
             private=user['protected'],
         )
+
+    def search(self, query: str) -> list:
+        html = self._search_json(query)['items_html']
+        document = BeautifulSoup(html, 'lxml')
+        tweets = document.find_all('li', attrs={'data-item-type': 'tweet'})
+        return [_parse_tweet(tweet) for tweet in tweets]

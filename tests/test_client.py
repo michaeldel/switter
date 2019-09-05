@@ -25,3 +25,15 @@ def test_twitter():
     assert twitter['created_at'] == datetime.datetime(
         2007, 2, 20, 14, 35, 54, tzinfo=datetime.timezone.utc
     )
+
+
+def test_pineapple_search():
+    tweets = Switter().search('pineapple')
+    assert len(tweets) > 0
+
+    for tweet in tweets:
+        assert (
+            'pineapple' in tweet['text'].lower()
+            or 'pineapple' in tweet['user_screen_name'].lower()
+            or 'pineapple' in tweet['user_name'].lower()
+        )
