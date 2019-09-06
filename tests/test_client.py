@@ -31,9 +31,7 @@ def test_pineapple_search():
     tweets = Switter().search('pineapple')
     assert len(tweets) > 0
 
+    fields = ('text', 'user_screen_name', 'user_name', 'mentions')
+
     for tweet in tweets:
-        assert (
-            'pineapple' in tweet['text'].lower()
-            or 'pineapple' in tweet['user_screen_name'].lower()
-            or 'pineapple' in tweet['user_name'].lower()
-        )
+        assert any('pineapple' in (tweet[field] or '').lower() for field in fields)

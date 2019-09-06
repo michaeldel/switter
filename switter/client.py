@@ -28,6 +28,7 @@ def _parse_tweet(tweet: BeautifulSoup) -> dict:
         'replies_count': _tweet_stat(div, 'reply'),
         'retweets_count': _tweet_stat(div, 'retweet'),
         'favorites_count': _tweet_stat(div, 'favorite'),
+        'mentions': div.attrs.get('data-mentions', '').split(),
     }
 
 
