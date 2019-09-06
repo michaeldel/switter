@@ -1,5 +1,7 @@
 import datetime
 
+from unittest import mock
+
 from switter.client import Switter
 
 
@@ -28,10 +30,44 @@ def test_twitter():
 
 
 def test_pineapple_search():
-    tweets = Switter().search('pineapple')
+    tweets = list(Switter().search('pineapple'))
     assert len(tweets) > 0
 
     fields = ('text', 'user_screen_name', 'user_name', 'mentions')
 
     for tweet in tweets:
         assert any('pineapple' in (tweet[field] or '').lower() for field in fields)
+
+
+def test_search_len():
+    client = Switter()
+    # default limit should be 20
+    assert len(list(client.search('twitter'))) == 20
+
+    # we should be able to go further
+    assert len(list(client.search('twitter', limit=50))) == 50
+
+
+@mock.patch('switter.client._parse_tweet', new=mock.Mock)
+@mock.patch('switter.client.Switter._search_json')
+@mock.patch('switter.client._extract_tweets_html')
+def test_search(extract_tweets, search_json):
+    search_json.return_value = {
+        'items_html': mock.Mock(),
+        'has_more_items': True,
+        'min_position': mock.Mock,
+    }
+
+    extract_tweets.return_value = list(range(20))
+    client = Switter()
+
+    for limit in (5, 10, 20, 50):
+        result = list(client.search('foo', limit=limit))
+        assert len(result) == limit
+
+    # only one page available
+    search_json.return_value = {'items_html': mock.Mock(), 'has_more_items': False}
+
+    for limit in (5, 10, 20, 50):
+        result = list(client.search('foo', limit=limit))
+        assert len(result) == min(limit, 20)

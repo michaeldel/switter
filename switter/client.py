@@ -3,10 +3,17 @@ import html
 import json
 import requests
 
+from typing import Iterable, List, Optional
+
 from bs4 import BeautifulSoup
 
 
 _CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'  # noqa: E501
+
+
+def _extract_tweets_html(html: str) -> List[BeautifulSoup]:
+    document = BeautifulSoup(html, 'lxml')
+    return document.find_all('li', attrs={'data-item-type': 'tweet'})
 
 
 def _parse_tweet(tweet: BeautifulSoup) -> dict:
@@ -51,9 +58,11 @@ class Switter:
         response.raise_for_status()
         return response.text
 
-    def _search_json(self, query: str) -> dict:
+    def _search_json(self, query: str, max_position: Optional[str] = None) -> dict:
         url = 'https://twitter.com/i/search/timeline'
-        response = self._session.get(url, params={'q': query, 'f': 'tweets'})
+        response = self._session.get(
+            url, params={'q': query, 'f': 'tweets', 'max_position': max_position or -1}
+        )
         response.raise_for_status()
         return response.json()
 
@@ -86,8 +95,20 @@ class Switter:
             private=user['protected'],
         )
 
-    def search(self, query: str) -> list:
-        html = self._search_json(query)['items_html']
-        document = BeautifulSoup(html, 'lxml')
-        tweets = document.find_all('li', attrs={'data-item-type': 'tweet'})
-        return [_parse_tweet(tweet) for tweet in tweets]
+    def search(self, query: str, *, limit=20) -> Iterable[dict]:
+        assert limit > 0
+
+        count = 0
+        position = -1
+
+        while True:
+            data = self._search_json(query, max_position=position)
+            tweets = _extract_tweets_html(data['items_html'])
+
+            yield from map(_parse_tweet, tweets[: limit - count])
+            count += len(tweets)
+
+            if not data['has_more_items'] or count >= limit:
+                break
+
+            position = data['min_position']
