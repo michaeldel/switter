@@ -1,4 +1,5 @@
 import datetime
+import responses
 
 from unittest import mock
 
@@ -71,3 +72,28 @@ def test_search(extract_tweets, search_json):
     for limit in (5, 10, 20, 50):
         result = list(client.search('foo', limit=limit))
         assert len(result) == min(limit, 20)
+
+
+@responses.activate
+def test_followers_page(followers_empty_html, followers_full_html, followers_last_html):
+    client = Switter()
+    base = 'https://mobile.twitter.com'
+
+    for url, body in (
+        (f'{base}/full/followers?cursor=123456789', followers_empty_html),
+        (f'{base}/full/followers', followers_full_html),
+        (f'{base}/last/followers', followers_last_html),
+    ):
+        responses.add(responses.GET, url, body=body, content_type='text/html')
+
+    followers, cursor = client.followers_page('full')
+    assert followers == ['alice', 'bob', 'carol']
+    assert cursor == 123_456_789
+
+    followers, cursor = client.followers_page('full', cursor=cursor)
+    assert followers == []
+    assert cursor is None
+
+    followers, cursor = client.followers_page('last', cursor=cursor)
+    assert followers == ['david']
+    assert cursor is None
