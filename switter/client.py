@@ -133,8 +133,6 @@ class Switter:
         )
         response.raise_for_status()
 
-        print(response.request.url)
-
         document = BeautifulSoup(response.text, 'lxml')
 
         screen_names = _parse_followers_screen_names(document)
