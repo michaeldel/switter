@@ -84,7 +84,7 @@ class Switter:
         response.raise_for_status()
         return response.text
 
-    def _search_json(self, query: str, max_position: Optional[str] = None) -> dict:
+    def _search_json(self, query: str, max_position: Optional[int] = None) -> dict:
         url = 'https://twitter.com/i/search/timeline'
         response = self._session.get(
             url, params={'q': query, 'f': 'tweets', 'max_position': max_position or -1}
@@ -138,9 +138,9 @@ class Switter:
         document = BeautifulSoup(response.text, 'lxml')
 
         screen_names = _parse_followers_screen_names(document)
-        cursor = _parse_followers_cursor(document)
+        next_cursor = _parse_followers_cursor(document)
 
-        return screen_names, cursor
+        return screen_names, next_cursor
 
     def search(self, query: str, *, limit=20) -> Iterable[dict]:
         assert limit > 0
