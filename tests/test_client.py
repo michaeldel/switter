@@ -31,13 +31,16 @@ def test_twitter():
 
 
 def test_pineapple_search():
-    tweets = list(Switter().search('pineapple'))
+    keyword = 'pineapple'
+    tweets = list(Switter().search(keyword))
     assert len(tweets) > 0
 
-    fields = ('text', 'user_screen_name', 'user_name', 'mentions')
+    fields = ('text', 'user_screen_name', 'user_name')
 
     for tweet in tweets:
-        assert any('pineapple' in (tweet[field] or '').lower() for field in fields)
+        assert any(keyword in (tweet[field] or '').lower() for field in fields) or any(
+            keyword for mention in tweet['mentions']
+        )
 
 
 def test_search_len():
@@ -49,10 +52,11 @@ def test_search_len():
     assert len(list(client.search('twitter', limit=50))) == 50
 
 
+@mock.patch('switter.client.HTML', new=mock.Mock)
 @mock.patch('switter.client._parse_tweet', new=mock.Mock)
+@mock.patch('switter.client._extract_tweets')
 @mock.patch('switter.client.Switter._search_json')
-@mock.patch('switter.client._extract_tweets_html')
-def test_search(extract_tweets, search_json):
+def test_search(search_json, extract_tweets):
     search_json.return_value = {
         'items_html': mock.Mock(),
         'has_more_items': True,

@@ -1,25 +1,22 @@
 import datetime
 import html
 import json
-import requests
 import urllib.parse
 
 from typing import Iterable, List, Optional, Tuple
 
 from requests_html import Element, HTML, HTMLSession  # type: ignore
 
-
 _CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'  # noqa: E501
 
 
-def _extract_tweets_html(html: str) -> List[BeautifulSoup]:
-    document = BeautifulSoup(html, 'lxml')
-    return document.find_all('li', attrs={'data-item-type': 'tweet'})
+def _extract_tweets(html: HTML) -> List[Element]:
+    return html.find('li[data-item-type=tweet]')
 
 
-def _parse_tweet(tweet: BeautifulSoup) -> dict:
-    div = tweet.find('div', attrs={'class': 'tweet'})
-    timestamp = tweet.select_one('a.tweet-timestamp > span._timestamp')
+def _parse_tweet(tweet: Element) -> dict:
+    div = tweet.find('div.tweet', first=True)
+    timestamp = tweet.find('a.tweet-timestamp > span._timestamp', first=True)
 
     created_at = datetime.datetime.fromtimestamp(
         int(timestamp.attrs['data-time-ms']) / 1000, tz=datetime.timezone.utc
@@ -32,7 +29,7 @@ def _parse_tweet(tweet: BeautifulSoup) -> dict:
         'user_id': int(div.attrs['data-user-id']),
         'user_name': div.attrs['data-name'],
         'user_screen_name': div.attrs['data-screen-name'],
-        'text': div.find('p', attrs={'class': 'tweet-text'}).text,
+        'text': div.find('p.tweet-text', first=True).text,
         'replies_count': _tweet_stat(div, 'reply'),
         'retweets_count': _tweet_stat(div, 'retweet'),
         'favorites_count': _tweet_stat(div, 'favorite'),
@@ -40,23 +37,24 @@ def _parse_tweet(tweet: BeautifulSoup) -> dict:
     }
 
 
-def _tweet_stat(tweet: BeautifulSoup, name: str) -> int:
+def _tweet_stat(tweet: Element, name: str) -> int:
     return int(
-        tweet.select_one(
-            f'span.ProfileTweet-action--{name} > span.ProfileTweet-actionCount'
+        tweet.find(
+            f'span.ProfileTweet-action--{name} > span.ProfileTweet-actionCount',
+            first=True,
         ).attrs['data-tweet-stat-count']
     )
 
 
-def _parse_followers_screen_names(document: BeautifulSoup) -> List[str]:
-    cells = document.select(
+def _parse_followers_screen_names(document: HTML) -> List[str]:
+    cells = document.find(
         'div.profile div.user-list table.user-item tr td.info.screenname'
     )
-    return [cell.find('a', attrs={'name': True}).attrs['name'] for cell in cells]
+    return [cell.find('a[name]', first=True).attrs['name'] for cell in cells]
 
 
-def _parse_followers_cursor(document: BeautifulSoup) -> Optional[int]:
-    next_page_button = document.select_one('div.w-button-more a')
+def _parse_followers_cursor(document: HTML) -> Optional[int]:
+    next_page_button = document.find('div.w-button-more a', first=True)
     if not next_page_button:
         return None
 
@@ -70,7 +68,7 @@ def _parse_followers_cursor(document: BeautifulSoup) -> Optional[int]:
 
 class Switter:
     def __init__(self):
-        self._session = requests.Session()
+        self._session = HTMLSession()
         self._session.headers.update({'User-Agent': _CHROME_USER_AGENT})
 
         self._enable_legacy_site()
@@ -78,11 +76,11 @@ class Switter:
     def _enable_legacy_site(self):
         self._session.cookies.set('m5', 'off')
 
-    def _profile_html(self, screen_name: str) -> str:
+    def _profile_html(self, screen_name: str) -> HTML:
         url = f'https://twitter.com/{screen_name}'
         response = self._session.get(url)
         response.raise_for_status()
-        return response.text
+        return response.html
 
     def _search_json(self, query: str, max_position: Optional[int] = None) -> dict:
         url = 'https://twitter.com/i/search/timeline'
@@ -93,13 +91,11 @@ class Switter:
         return response.json()
 
     def profile(self, screen_name: str) -> dict:
-        profile_html = self._profile_html(screen_name)
-        document = BeautifulSoup(profile_html, 'lxml')
+        document = self._profile_html(screen_name)
         data = json.loads(
             html.unescape(
                 document.find(
-                    'input',
-                    attrs={'id': 'init-data', 'class': 'json-data', 'type': 'hidden'},
+                    'input.json-data[id=init-data][type=hidden]', first=True
                 ).attrs['value']
             )
         )
@@ -133,7 +129,7 @@ class Switter:
         )
         response.raise_for_status()
 
-        document = BeautifulSoup(response.text, 'lxml')
+        document = response.html
 
         screen_names = _parse_followers_screen_names(document)
         next_cursor = _parse_followers_cursor(document)
@@ -148,7 +144,8 @@ class Switter:
 
         while True:
             data = self._search_json(query, max_position=position)
-            tweets = _extract_tweets_html(data['items_html'])
+            html = HTML(html=data['items_html'])
+            tweets = _extract_tweets(html)
 
             yield from map(_parse_tweet, tweets[: limit - count])
             count += len(tweets)
