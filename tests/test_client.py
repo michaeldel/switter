@@ -1,7 +1,10 @@
 import datetime
-import responses
 
 from unittest import mock
+
+import responses
+
+from switter.client import INITIAL_CURSOR
 
 
 def test_twitter_profile(client):
@@ -98,3 +101,23 @@ def test_followers_page(
     followers, cursor = client.followers_page('last', cursor=cursor)
     assert followers == ['david']
     assert cursor is None
+
+
+@mock.patch('switter.client.Switter.followers_page')
+def test_followers(followers_page, client):
+    followers_page.return_value = (), None
+    assert list(client.followers('foo')) == []
+
+    followers_page.assert_called_once_with('foo', INITIAL_CURSOR)
+    followers_page.reset_mock()
+
+    followers_page.side_effect = (
+        (('a', 'b', 'c'), 1),
+        (('d', 'e', 'f'), 2),
+        (('g', 'h'), None),
+        (('i', 'j', 'k'), 3),  # should not be reached
+    )
+    assert list(client.followers('foo')) == list('abcdefgh')
+    followers_page.assert_has_calls(
+        (mock.call('foo', INITIAL_CURSOR), mock.call('foo', 1), mock.call('foo', 2))
+    )

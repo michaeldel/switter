@@ -9,6 +9,8 @@ from requests_html import Element, HTML, HTMLSession  # type: ignore
 
 _CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'  # noqa: E501
 
+INITIAL_CURSOR = -1
+
 
 def _extract_tweets(html: HTML) -> List[Element]:
     return html.find('li[data-item-type=tweet]')
@@ -117,15 +119,18 @@ class Switter:
             private=user['protected'],
         )
 
-    def followers(self, screen_name: str, *, limit=20) -> Iterable[str]:
-        raise NotImplementedError
+    def followers(self, screen_name: str) -> Iterable[str]:
+        cursor: Optional[int] = INITIAL_CURSOR
+        while cursor is not None:
+            screen_names, cursor = self.followers_page(screen_name, cursor)
+            yield from screen_names
 
     def followers_page(
-        self, screen_name: str, cursor: int = -1
+        self, screen_name: str, cursor: int = INITIAL_CURSOR
     ) -> Tuple[List[str], Optional[int]]:
         response = self._session.get(
             f'https://mobile.twitter.com/{screen_name}/followers',
-            params={'cursor': cursor} if cursor != -1 else None,
+            params={'cursor': cursor} if cursor != INITIAL_CURSOR else None,
         )
         response.raise_for_status()
 
