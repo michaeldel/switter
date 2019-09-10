@@ -1,5 +1,12 @@
 import pytest
 
+from switter.client import Switter
+
+
+@pytest.fixture
+def client():
+    return Switter()
+
 
 @pytest.fixture
 def followers_full_html(shared_datadir):

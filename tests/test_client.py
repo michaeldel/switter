@@ -3,12 +3,10 @@ import responses
 
 from unittest import mock
 
-from switter.client import Switter
 
-
-def test_twitter():
+def test_twitter_profile(client):
     """Twitter accound should provide some fixed information"""
-    twitter = Switter().profile('twitter')
+    twitter = client.profile('twitter')
 
     assert twitter['id'] == 783_214
     assert twitter['screen_name'] == 'Twitter'
@@ -30,9 +28,9 @@ def test_twitter():
     )
 
 
-def test_pineapple_search():
+def test_pineapple_search(client):
     keyword = 'pineapple'
-    tweets = list(Switter().search(keyword))
+    tweets = list(client.search(keyword))
     assert len(tweets) > 0
 
     fields = ('text', 'user_screen_name', 'user_name')
@@ -43,8 +41,7 @@ def test_pineapple_search():
         )
 
 
-def test_search_len():
-    client = Switter()
+def test_search_len(client):
     # default limit should be 20
     assert len(list(client.search('twitter'))) == 20
 
@@ -56,7 +53,7 @@ def test_search_len():
 @mock.patch('switter.client._parse_tweet', new=mock.Mock)
 @mock.patch('switter.client._extract_tweets')
 @mock.patch('switter.client.Switter._search_json')
-def test_search(search_json, extract_tweets):
+def test_search(search_json, extract_tweets, client):
     search_json.return_value = {
         'items_html': mock.Mock(),
         'has_more_items': True,
@@ -64,7 +61,6 @@ def test_search(search_json, extract_tweets):
     }
 
     extract_tweets.return_value = list(range(20))
-    client = Switter()
 
     for limit in (5, 10, 20, 50):
         result = list(client.search('foo', limit=limit))
@@ -79,8 +75,9 @@ def test_search(search_json, extract_tweets):
 
 
 @responses.activate
-def test_followers_page(followers_empty_html, followers_full_html, followers_last_html):
-    client = Switter()
+def test_followers_page(
+    client, followers_empty_html, followers_full_html, followers_last_html
+):
     base = 'https://mobile.twitter.com'
 
     for url, body in (
