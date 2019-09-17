@@ -3,7 +3,7 @@ import html
 import json
 import urllib.parse
 
-from typing import Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from requests_html import Element, HTML, HTMLSession  # type: ignore
 
@@ -69,9 +69,12 @@ def _parse_followers_cursor(document: HTML) -> Optional[int]:
 
 
 class Switter:
-    def __init__(self):
+    def __init__(self, *, proxies: Optional[Dict[str, str]] = None):
         self._session = HTMLSession()
         self._session.headers.update({'User-Agent': _CHROME_USER_AGENT})
+
+        if proxies:
+            self._session.proxies.update(proxies)
 
         self._enable_legacy_site()
 
